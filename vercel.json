@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "builds": [
+    { "src": "landing/**/*", "use": "@vercel/static" }
+  ],
+  "routes": [
+    { "src": "/api/(.*)", "dest": "/api/$1" },
+    { "src": "/dashboard", "dest": "landing/dashboard.html" },
+    { "src": "/signup", "dest": "landing/signup.html" },
+    { "src": "/login", "dest": "landing/login.html" },
+    { "src": "/(.*)", "dest": "landing/$1" }
+  ]
+}

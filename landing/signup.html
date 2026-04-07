@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Criar Conta - Zampolli AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #0a0b12; color: #e4e6f0; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #12141f; border: 1px solid #2a2e42; border-radius: 20px; padding: 40px; width: 100%; max-width: 400px; }
+    .logo { display: flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; color: #fff; margin-bottom: 8px; text-decoration: none; }
+    .logo svg { width: 32px; height: 32px; }
+    .card h2 { font-size: 24px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .card > p { font-size: 14px; color: #8b8fa3; margin-bottom: 32px; }
+    label { display: block; font-size: 13px; font-weight: 600; color: #b0b4c8; margin-bottom: 6px; }
+    input { width: 100%; padding: 12px 14px; border-radius: 10px; border: 1px solid #2a2e42; background: #0a0b12; color: #e4e6f0; font-size: 14px; font-family: inherit; margin-bottom: 16px; outline: none; }
+    input:focus { border-color: #7b73ff; }
+    .btn { width: 100%; padding: 13px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; color: #fff; cursor: pointer; background: linear-gradient(135deg, #7b73ff, #4a44db); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error-msg { background: #2a1515; border: 1px solid #4a2020; color: #f87171; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+    .success-msg { background: #152a15; border: 1px solid #204a20; color: #4ade80; padding: 10px 14px; border-radius: 8px; font-size: 13px; margin-bottom: 16px; display: none; }
+    .footer-link { text-align: center; margin-top: 24px; font-size: 13px; color: #8b8fa3; }
+    .footer-link a { color: #7b73ff; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <a href="/" class="logo">
+      <svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="14" fill="#181b28" stroke="#4a44db" stroke-width="1.5"/><path d="M9 10h14l-12 12h11" fill="none" stroke="#7b73ff" stroke-width="2.5" stroke-linecap="round"/></svg>
+      Zampolli AI
+    </a>
+    <h2>Criar conta</h2>
+    <p>Comece a automatizar seu Salesforce com IA.</p>
+    <div id="error" class="error-msg"></div>
+    <div id="success" class="success-msg"></div>
+    <form id="signupForm" onsubmit="handleSignup(event)">
+      <label>Nome</label>
+      <input type="text" id="name" placeholder="Seu nome" required>
+      <label>Email</label>
+      <input type="email" id="email" placeholder="seu@email.com" required>
+      <label>Senha</label>
+      <input type="password" id="password" placeholder="Minimo 6 caracteres" required minlength="6">
+      <button type="submit" class="btn" id="submitBtn">Criar Conta</button>
+    </form>
+    <div class="footer-link">Ja tem conta? <a href="/login">Entrar</a></div>
+  </div>
+
+  <script>
+    function getQueryParam(key) {
+      var urlParams = new URLSearchParams(window.location.search);
+      return urlParams.get(key);
+    }
+    var plan = getQueryParam('plan');
+
+    window.addEventListener('load', function() {
+      console.log('[Signup] Page loaded, form attached.');
+    });
+
+    function handleSignup(e) {
+      e.preventDefault();
+      console.log('[Signup] Form submitted.');
+      var errorDiv = document.getElementById('error');
+      var successDiv = document.getElementById('success');
+      var btn = document.getElementById('submitBtn');
+      errorDiv.style.display = 'none';
+      successDiv.style.display = 'none';
+      btn.disabled = true;
+      btn.textContent = 'Criando...';
+
+      var name = document.getElementById('name').value;
+      var email = document.getElementById('email').value;
+      var password = document.getElementById('password').value;
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/auth/register', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.onload = function() {
+        var data;
+        try { data = JSON.parse(xhr.responseText); } catch (ex) {
+          showError('Erro de conexao. Tente novamente.');
+          return;
+        }
+        if (xhr.status !== 200 || (data && data.error)) {
+          showError(data && data.error ? data.error : 'Erro ao criar conta.');
+          return;
+        }
+        // Success
+        localStorage.setItem('zampolli_token', data.token);
+        localStorage.setItem('zampolli_name', data.name);
+        localStorage.setItem('zampolli_plan', data.plan);
+        successDiv.textContent = 'Conta criada! Redirecionando...';
+        successDiv.style.display = 'block';
+
+        if (plan === 'pro') {
+          goToCheckout(data.token);
+        } else {
+          setTimeout(function() { window.location.href = '/dashboard'; }, 500);
+        }
+      };
+      xhr.onerror = function() {
+        showError('Erro de conexao. Tente novamente.');
+      };
+      xhr.send(JSON.stringify({ name: name, email: email, password: password }));
+    }
+
+    function goToCheckout(token) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/billing/checkout', true);
+      xhr.setRequestHeader('Content-Type', 'application/json');
+      xhr.setRequestHeader('Authorization', 'Bearer ' + token);
+      xhr.onload = function() {
+        try {
+          var data = JSON.parse(xhr.responseText);
+          if (data.checkoutUrl) {
+            window.location.href = data.checkoutUrl;
+          } else {
+            window.location.href = '/dashboard';
+          }
+        } catch (ex) {
+          window.location.href = '/dashboard';
+        }
+      };
+      xhr.send();
+    }
+
+    function showError(msg) {
+      var errorDiv = document.getElementById('error');
+      var btn = document.getElementById('submitBtn');
+      errorDiv.textContent = msg;
+      errorDiv.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = 'Criar Conta';
+    }
+  </script>
+</body>
+</html>

@@ -15,7 +15,7 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 
 // ── Security ──
 app.use(helmet({
-  contentSecurityPolicy: undefined,
+  contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
 }));
 
@@ -27,7 +27,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'landing')));
+app.use(express.static(path.join(__dirname, 'landing'), {
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate'),
+}));
 
 // ── Rate limiting ──
 const authLimiter = rateLimit({
@@ -90,6 +92,14 @@ const PRO_PRICE_ID = process.env.STRIPE_PRICE_ID_PRO || '';
 // ── Landing ──
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'landing', 'index.html'));
+});
+
+app.get('/signup', (req, res) => {
+  res.sendFile(path.join(__dirname, 'landing', 'signup.html'));
+});
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'landing', 'login.html'));
 });
 
 app.get('/dashboard', (req, res) => {

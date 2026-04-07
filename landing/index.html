@@ -520,7 +520,7 @@
           <li>Flows, Campos e Validation Rules</li>
           <li>Suporte na comunidade</li>
         </ul>
-        <a href="#" class="btn btn-secondary" style="width:100%;justify-content:center;">Começar Agora</a>
+        <a href="/signup" class="btn btn-secondary" style="width:100%;justify-content:center;">Começar Agora</a>
       </div>
       <div class="price-card featured">
         <div class="price-name">Pro</div>
@@ -582,6 +582,43 @@
         this.classList.toggle('open');
       });
     });
+
+    // Subscribe Pro — calls checkout API
+    var btnPro = document.querySelector('.pricing-grid .featured .btn-primary');
+    if (btnPro) {
+      btnPro.addEventListener('click', function(e) {
+        e.preventDefault();
+        var token = localStorage.getItem('zampolli_token');
+        if (!token) {
+          window.location.href = '/signup?plan=pro';
+          return;
+        }
+        btnPro.textContent = 'Carregando...';
+        btnPro.style.pointerEvents = 'none';
+        fetch('/api/billing/checkout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer ' + token,
+          },
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.checkoutUrl) {
+            window.location.href = data.checkoutUrl;
+          } else if (data.error) {
+            alert('Erro: ' + data.error);
+            btnPro.textContent = 'Assinar Pro';
+            btnPro.style.pointerEvents = 'auto';
+          }
+        })
+        .catch(function() {
+          alert('Erro ao conectar. Tente novamente.');
+          btnPro.textContent = 'Assinar Pro';
+          btnPro.style.pointerEvents = 'auto';
+        });
+      });
+    }
   </script>
 </body>
 </html>
