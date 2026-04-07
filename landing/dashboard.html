@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard — Zampolli AI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { font-family:'Inter',system-ui,sans-serif; background:#0a0b12; color:#e4e6f0; min-height:100vh; }
+
+    .page { display:none; min-height:100vh; }
+    .page.active { display:flex; }
+
+    /* ── AUTH PAGE ── */
+    .auth-page {
+      width:100%; min-height:100vh; flex-direction:column;
+      align-items:center; justify-content:center; padding:24px;
+    }
+    .auth-card {
+      width:100%; max-width:400px; background:#12141f; border:1px solid #2a2e42;
+      border-radius:20px; padding:40px;
+    }
+    .auth-logo {
+      display:flex; align-items:center; gap:10px; justify-content:center;
+      margin-bottom:32px;
+    }
+    .auth-logo svg { width:36px; height:36px; }
+    .auth-logo span { font-size:20px; font-weight:800; color:#fff; letter-spacing:-.3px; }
+    .auth-tabs { display:flex; gap:4px; margin-bottom:28px; background:#0a0b12; border-radius:10px; padding:4px; }
+    .auth-tab {
+      flex:1; padding:8px; border:none; background:none; color:#8b8fa3;
+      font-size:13px; font-weight:600; cursor:pointer; border-radius:8px;
+      transition:background .2s,color .2s;
+    }
+    .auth-tab.active { background:#181b28; color:#fff; }
+    .auth-form { display:flex; flex-direction:column; gap:16px; }
+    .auth-field label { display:block; font-size:12px; font-weight:500; color:#8b8fa3; margin-bottom:6px; }
+    .auth-field input {
+      width:100%; padding:11px 14px; border-radius:10px; border:1.5px solid #2a2e42;
+      background:#181b28; color:#e4e6f0; font-size:14px; outline:none; transition:border-color .2s;
+    }
+    .auth-field input:focus { border-color:#7b73ff; }
+    .auth-btn {
+      width:100%; padding:12px; background:linear-gradient(135deg,#7b73ff,#4a44db); color:#fff;
+      border:none; border-radius:10px; font-size:14px; font-weight:600; cursor:pointer;
+      transition:opacity .2s,transform .1s; margin-top:4px;
+    }
+    .auth-btn:hover { opacity:.88; }
+    .auth-btn:active { transform:scale(.97); }
+    .auth-error { color:#f87171; font-size:12px; text-align:center; display:none; }
+
+    /* ── DASHBOARD ── */
+    .dash-layout { width:100%; min-height:100vh; display:flex; }
+    .dash-sidebar {
+      width:240px; background:#12141f; border-right:1px solid #2a2e42;
+      padding:20px 0; flex-shrink:0;
+    }
+    .dash-sidebar-logo {
+      display:flex; align-items:center; gap:10px; padding:0 20px 20px;
+      border-bottom:1px solid #2a2e42; margin-bottom:16px;
+    }
+    .dash-sidebar-logo svg { width:28px; height:28px; }
+    .dash-sidebar-logo span { font-size:15px; font-weight:800; color:#fff; }
+    .dash-nav { list-style:none; padding:0 8px; display:flex; flex-direction:column; gap:2px; }
+    .dash-nav a {
+      display:flex; align-items:center; gap:10px; padding:9px 14px;
+      border-radius:8px; color:#8b8fa3; text-decoration:none; font-size:13px;
+      font-weight:500; transition:background .15s,color .15s;
+    }
+    .dash-nav a:hover, .dash-nav a.active { background:rgba(123,115,255,.1); color:#fff; }
+    .dash-nav a svg { width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.5; }
+
+    .dash-main { flex:1; padding:32px; max-width:900px; }
+    .dash-welcome { margin-bottom:32px; }
+    .dash-welcome h1 { font-size:24px; font-weight:700; color:#fff; margin-bottom:4px; }
+    .dash-welcome p { font-size:14px; color:#8b8fa3; }
+
+    .dash-stats { display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:32px; }
+    .dash-stat {
+      background:#12141f; border:1px solid #2a2e42; border-radius:14px;
+      padding:24px;
+    }
+    .dash-stat-label { font-size:11px; font-weight:600; color:#8b8fa3; text-transform:uppercase; letter-spacing:.5px; }
+    .dash-stat-value { font-size:32px; font-weight:800; color:#fff; margin-top:8px; }
+    .dash-stat-value small { font-size:14px; font-weight:500; color:#8b8fa3; }
+
+    .dash-section { background:#12141f; border:1px solid #2a2e42; border-radius:14px; padding:24px; margin-bottom:20px; }
+    .dash-section-title { font-size:15px; font-weight:700; color:#fff; margin-bottom:16px; }
+
+    .dash-org-form { display:flex; flex-direction:column; gap:12px; }
+    .dash-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .dash-input {
+      padding:10px 14px; border-radius:10px; border:1.5px solid #2a2e42;
+      background:#181b28; color:#e4e6f0; font-size:13px; outline:none; font-family:inherit;
+      transition:border-color .2s;
+    }
+    .dash-input:focus { border-color:#7b73ff; }
+    .dash-select option { background:#181b28; color:#e4e6f0; }
+    .dash-connect-btn {
+      padding:11px 20px; background:linear-gradient(135deg,#7b73ff,#4a44db); color:#fff;
+      border:none; border-radius:10px; font-size:13px; font-weight:600; cursor:pointer;
+      align-self:flex-start; transition:opacity .2s;
+    }
+    .dash-connect-btn:hover { opacity:.88; }
+
+    .upgrade-banner {
+      background:linear-gradient(135deg,rgba(123,115,255,.1),rgba(74,68,219,.05));
+      border:1px solid rgba(123,115,255,.2); border-radius:14px;
+      padding:28px; display:flex; align-items:center; justify-content:space-between;
+    }
+    .upgrade-banner h3 { font-size:17px; font-weight:700; color:#fff; margin-bottom:4px; }
+    .upgrade-banner p { font-size:13px; color:#8b8fa3; }
+
+    @media (max-width:768px) {
+      .dash-sidebar { display:none; }
+      .dash-stats { grid-template-columns:1fr; }
+      .dash-row { grid-template-columns:1fr; }
+      .dash-main { padding:20px; }
+      .upgrade-banner { flex-direction:column; gap:16px; text-align:center; }
+    }
+  </style>
+</head>
+<body>
+  <!-- ── AUTH PAGE ── -->
+  <div class="page auth-page active" id="authPage">
+    <div class="auth-card">
+      <div class="auth-logo">
+        <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="16" cy="16" r="14" fill="#181b28" stroke="#4a44db" stroke-width="1.5"/>
+          <path d="M9 10h14l-12 12h11" fill="none" stroke="url(#z2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs><linearGradient id="z2" x1="0" y1="8" x2="32" y2="24"><stop offset="0%" stop-color="#b8a9ff"/><stop offset="100%" stop-color="#4a44db"/></linearGradient></defs>
+        </svg>
+        <span>Zampolli AI</span>
+      </div>
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="showTab('login')">Login</button>
+        <button class="auth-tab" onclick="showTab('register')">Criar Conta</button>
+      </div>
+      <form class="auth-form" id="authForm">
+        <div class="auth-field" id="nameField" style="display:none">
+          <label>Nome</label>
+          <input type="text" id="authName" placeholder="Seu nome">
+        </div>
+        <div class="auth-field">
+          <label>Email</label>
+          <input type="email" id="authEmail" placeholder="seu@email.com" required>
+        </div>
+        <div class="auth-field">
+          <label>Senha</label>
+          <input type="password" id="authPassword" placeholder="••••••••" required>
+        </div>
+        <div class="auth-error" id="authError"></div>
+        <button type="submit" class="auth-btn" id="authSubmit">Entrar</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── DASHBOARD ── -->
+  <div class="page" id="dashPage">
+    <div class="dash-layout">
+      <aside class="dash-sidebar">
+        <div class="dash-sidebar-logo">
+          <svg viewBox="0 0 32 32" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="16" cy="16" r="14" fill="#181b28" stroke="#4a44db" stroke-width="1.5"/>
+            <path d="M9 10h14l-12 12h11" fill="none" stroke="#7b73ff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>Zampolli</span>
+        </div>
+        <ul class="dash-nav">
+          <li><a href="#" class="active" data-tab="overview">
+            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            Dashboard
+          </a></li>
+          <li><a href="#" data-tab="orgs">
+            <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5"/></svg>
+            Orgs
+          </a></li>
+          <li><a href="#" data-tab="billing">
+            <svg viewBox="0 0 24 24"><path d="M20 12V22H4V12M22 7H2V12H22V7Z"/></svg>
+            Billing
+          </a></li>
+          <li><a href="#" onclick="doLogout()" style="margin-top:auto;color:#f87171;">
+            <svg viewBox="0 0 24 24" stroke="#f87171"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            Sair
+          </a></li>
+        </ul>
+      </aside>
+      <main class="dash-main">
+        <!-- Overview -->
+        <div id="tab-overview" class="dash-tab-content">
+          <div class="dash-welcome">
+            <h1>Bem-vindo, <span id="dashName">User</span>! 👋</h1>
+            <p>Gerencie suas orgs Salesforce e acompanhe seu uso.</p>
+          </div>
+          <div class="dash-stats">
+            <div class="dash-stat">
+              <div class="dash-stat-label">Automações</div>
+              <div class="dash-stat-value" id="statUsage">0 <small>/ 10</small></div>
+            </div>
+            <div class="dash-stat">
+              <div class="dash-stat-label">Plano</div>
+              <div class="dash-stat-value" id="statPlan" style="font-size:20px">Free</div>
+            </div>
+            <div class="dash-stat">
+              <div class="dash-stat-label">Orgs Conectadas</div>
+              <div class="dash-stat-value" id="statOrgs">0</div>
+            </div>
+          </div>
+          <div class="upgrade-banner">
+            <div>
+              <h3>Atualize para o Pro</h3>
+              <p>Automações ilimitadas, orgs ilimitadas, Screen Flows e Apex generation.</p>
+            </div>
+            <button class="dash-connect-btn" onclick="doUpgrade()">Assinar R$97/mês</button>
+          </div>
+        </div>
+
+        <!-- Orgs -->
+        <div id="tab-orgs" class="dash-tab-content" style="display:none">
+          <div class="dash-section">
+            <div class="dash-section-title">Conectar nova org</div>
+            <form class="dash-org-form" id="orgForm">
+              <div class="dash-field">
+                <label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:6px">Org Label (opcional)</label>
+                <input class="dash-input" type="text" id="orgLabel" placeholder="Minha Org">
+              </div>
+              <div class="dash-field">
+                <label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:6px">Username</label>
+                <input class="dash-input" type="text" id="orgUsername" placeholder="admin@company.com" required>
+              </div>
+              <div class="dash-field">
+                <label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:6px">Password + Token</label>
+                <input class="dash-input" type="password" id="orgPassword" placeholder="senha + token" required>
+              </div>
+              <div class="dash-field">
+                <label style="display:block;font-size:12px;color:#8b8fa3;margin-bottom:6px">Domínio</label>
+                <select class="dash-input dash-select" id="orgDomain">
+                  <option value="login">Produção (login.salesforce.com)</option>
+                  <option value="test">Sandbox (test.salesforce.com)</option>
+                </select>
+              </div>
+              <button type="submit" class="dash-connect-btn">Conectar Org</button>
+            </form>
+          </div>
+          <div class="dash-section">
+            <div class="dash-section-title">Orgs Conectadas</div>
+            <div id="orgsList" style="color:#8b8fa3;font-size:13px;">Nenhuma org conectada ainda.</div>
+          </div>
+        </div>
+
+        <!-- Billing -->
+        <div id="tab-billing" class="dash-tab-content" style="display:none">
+          <div class="dash-section">
+            <div class="dash-section-title">Seu Plano</div>
+            <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px;">
+              <div id="billingPlanFree" style="font-size:18px;font-weight:700;color:#8b8fa3;">Free</div>
+            </div>
+            <p style="color:#8b8fa3;font-size:14px;margin-bottom:20px;">Upgrade para o Pro e desbloqueie automações ilimitadas.</p>
+            <button class="dash-connect-btn" onclick="doUpgrade()">Assinar Pro — R$97/mês</button>
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const API = window.location.origin;
+    let token = localStorage.getItem('token');
+
+    // Check session on load
+    if (token) { showDashboard(); }
+
+    // Tabs
+    let currentTab = 'login';
+    function showTab(tab) {
+      currentTab = tab;
+      document.querySelectorAll('.auth-tab').forEach(function(t,i) {
+        t.classList.toggle('active', (tab==='login' && i===0) || (tab==='register' && i===1));
+      });
+      document.getElementById('nameField').style.display = tab === 'register' ? 'block' : 'none';
+      document.getElementById('authSubmit').textContent = tab === 'login' ? 'Entrar' : 'Criar Conta';
+      document.getElementById('authError').style.display = 'none';
+    }
+
+    // Auth form
+    document.getElementById('authForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const errEl = document.getElementById('authError');
+      errEl.style.display = 'none';
+      const email = document.getElementById('authEmail').value;
+      const password = document.getElementById('authPassword').value;
+      const name = document.getElementById('authName').value;
+      const endpoint = currentTab === 'login' ? '/api/auth/login' : '/api/auth/register';
+      const body = currentTab === 'login'
+        ? { email, password }
+        : { name, email, password };
+
+      try {
+        const resp = await fetch(API + endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (data.error) {
+          errEl.textContent = data.error;
+          errEl.style.display = 'block';
+          return;
+        }
+        if (currentTab === 'register') {
+          token = data.token;
+          localStorage.setItem('token', token);
+          showDashboard();
+        } else {
+          token = data.token;
+          localStorage.setItem('token', token);
+          showDashboard();
+        }
+      } catch (err) {
+        errEl.textContent = 'Erro de rede. Verifique se o servidor está rodando.';
+        errEl.style.display = 'block';
+      }
+    });
+
+    function showDashboard() {
+      document.getElementById('authPage').classList.remove('active');
+      document.getElementById('dashPage').classList.add('active');
+      loadDashboard();
+    }
+
+    async function loadDashboard() {
+      try {
+        const resp = await fetch(API + '/api/dashboard', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        if (resp.status === 401) { doLogout(); return; }
+        const data = await resp.json();
+        document.getElementById('dashName').textContent = data.name;
+        document.getElementById('statUsage').innerHTML = data.usage + ' <small>/ ' + (data.limit === Infinity ? '∞' : data.limit) + '</small>';
+        document.getElementById('statPlan').textContent = data.plan === 'free' ? 'Free' : 'Pro';
+        document.getElementById('statOrgs').textContent = data.connectedOrgs || 0;
+      } catch (err) {}
+    }
+
+    function doLogout() {
+      token = null;
+      localStorage.removeItem('token');
+      document.getElementById('dashPage').classList.remove('active');
+      document.getElementById('authPage').classList.add('active');
+      document.getElementById('authEmail').value = '';
+      document.getElementById('authPassword').value = '';
+      showTab('login');
+    }
+
+    async function doUpgrade() {
+      try {
+        const resp = await fetch(API + '/api/billing/checkout', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' }
+        });
+        const data = await resp.json();
+        if (data.checkoutUrl) window.open(data.checkoutUrl, '_blank');
+      } catch (err) { alert('Erro ao criar checkout.'); }
+    }
+
+    // Orgs
+    document.getElementById('orgForm').addEventListener('submit', async function(e) {
+      e.preventDefault();
+      const body = {
+        label: document.getElementById('orgLabel').value,
+        username: document.getElementById('orgUsername').value,
+        password: document.getElementById('orgPassword').value,
+        domain: document.getElementById('orgDomain').value,
+      };
+      try {
+        const resp = await fetch(API + '/api/orgs/connect', {
+          method: 'POST',
+          headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await resp.json();
+        if (data.success) {
+          document.getElementById('orgForm').reset();
+          document.getElementById('orgsList').textContent = 'Org conectada com sucesso!';
+          loadDashboard();
+        } else {
+          document.getElementById('orgsList').textContent = 'Erro: ' + data.error;
+        }
+      } catch (err) { document.getElementById('orgsList').textContent = 'Erro de rede.'; }
+    });
+
+    // Nav tabs
+    document.querySelectorAll('.dash-nav a[data-tab]').forEach(function(link) {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        document.querySelectorAll('.dash-nav a').forEach(function(a) { a.classList.remove('active'); });
+        link.classList.add('active');
+        document.querySelectorAll('.dash-tab-content').forEach(function(t) { t.style.display = 'none'; });
+        document.getElementById('tab-' + link.dataset.tab).style.display = 'block';
+      });
+    });
+  </script>
+</body>
+</html>

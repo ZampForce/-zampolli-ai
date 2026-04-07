@@ -1,0 +1,10 @@
+.env
+.env.local
+*.db
+*.db-journal
+*.db-wal
+node_modules/
+.DS_Store
+*.log
+coverage/
+dist/

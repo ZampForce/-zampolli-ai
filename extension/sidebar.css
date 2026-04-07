@@ -1,0 +1,556 @@
+/* ========================================
+   Salesforce AI Flow Builder - Sidebar Styles
+   ======================================== */
+
+/* ── Reset & Base ───────────────────── */
+.sf-ai-agent * {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.sf-ai-agent {
+  --sf-blue: #0176d3;
+  --sf-blue-dark: #014486;
+  --sf-blue-hover: #005fb2;
+  --sf-dark-bg: #181818;
+  --sf-card-bg: #242424;
+  --sf-input-bg: #333333;
+  --sf-text: #e8e8e8;
+  --sf-text-secondary: #a0a0a0;
+  --sf-border: #3a3a3a;
+  --sf-success: #4bc076;
+  --sf-error: #e04545;
+  --sf-warning: #f59e0b;
+  --sf-radius: 8px;
+  --sf-transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Salesforce Sans', sans-serif;
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 380px;
+  height: 100vh;
+  z-index: 99999;
+  display: flex;
+  flex-direction: column;
+  background: var(--sf-dark-bg);
+  color: var(--sf-text);
+  transition: transform var(--sf-transition);
+  transform: translateX(0);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.3);
+}
+
+.sf-ai-agent.sf-collapsed {
+  transform: translateX(calc(100% - 36px));
+}
+
+/* ── Toggle Button ──────────────────── */
+.sf-toggle {
+  position: absolute;
+  left: -36px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 64px;
+  background: var(--sf-blue);
+  border: none;
+  border-radius: var(--sf-radius) 0 0 var(--sf-radius);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: -2px 0 8px rgba(1, 118, 211, 0.3);
+  transition: background var(--sf-transition);
+}
+
+.sf-toggle:hover {
+  background: var(--sf-blue-hover);
+}
+
+.sf-toggle-icon {
+  width: 18px;
+  height: 18px;
+  fill: #fff;
+  transition: transform var(--sf-transition);
+}
+
+.sf-collapsed .sf-toggle-icon {
+  transform: rotate(180deg);
+}
+
+/* ── Header ─────────────────────────── */
+.sf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  background: var(--sf-blue-dark);
+  border-bottom: 1px solid var(--sf-border);
+  flex-shrink: 0;
+}
+
+.sf-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.sf-logo {
+  width: 28px;
+  height: 28px;
+}
+
+.sf-header h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  letter-spacing: -0.01em;
+}
+
+.sf-header-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.sf-header-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--sf-transition);
+}
+
+.sf-header-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.sf-header-btn svg {
+  width: 14px;
+  height: 14px;
+  fill: #fff;
+}
+
+/* ── Context Bar ────────────────────── */
+.sf-context {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: rgba(1, 118, 211, 0.08);
+  border-bottom: 1px solid var(--sf-border);
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--sf-text-secondary);
+}
+
+.sf-context-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--sf-blue);
+  color: #fff;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+.sf-context-dot {
+  width: 4px;
+  height: 4px;
+  background: var(--sf-text-secondary);
+  border-radius: 50%;
+}
+
+/* ── Chat Area ──────────────────────── */
+.sf-chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scrollbar-width: thin;
+  scrollbar-color: #444 var(--sf-dark-bg);
+}
+
+.sf-chat::-webkit-scrollbar {
+  width: 6px;
+}
+
+.sf-chat::-webkit-scrollbar-track {
+  background: var(--sf-dark-bg);
+}
+
+.sf-chat::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 3px;
+}
+
+/* ── Messages ───────────────────────── */
+.sf-msg {
+  display: flex;
+  gap: 10px;
+  max-width: 92%;
+  animation: sfFadeIn 0.3s ease;
+}
+
+@keyframes sfFadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.sf-msg.sf-ai {
+  align-self: flex-start;
+}
+
+.sf-msg.sf-user {
+  align-self: flex-end;
+  flex-direction: row-reverse;
+}
+
+.sf-msg-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sf-msg.sf-ai .sf-msg-avatar {
+  background: var(--sf-blue);
+  color: #fff;
+}
+
+.sf-msg.sf-user .sf-msg-avatar {
+  background: #555;
+  color: #ddd;
+}
+
+.sf-msg-bubble {
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 13px;
+  line-height: 1.5;
+  word-wrap: break-word;
+}
+
+.sf-msg.sf-ai .sf-msg-bubble {
+  background: var(--sf-card-bg);
+  border-top-left-radius: 4px;
+}
+
+.sf-msg.sf-user .sf-msg-bubble {
+  background: var(--sf-blue);
+  border-top-right-radius: 4px;
+  color: #fff;
+}
+
+.sf-msg-bubble pre {
+  background: var(--sf-dark-bg);
+  border-radius: 6px;
+  padding: 10px;
+  margin: 8px 0;
+  font-size: 11px;
+  overflow-x: auto;
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+}
+
+.sf-msg-bubble code {
+  font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 11px;
+}
+
+.sf-msg-bubble strong {
+  font-weight: 600;
+}
+
+/* ── Status Badges ──────────────────── */
+.sf-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  margin-top: 8px;
+}
+
+.sf-status.sf-success {
+  background: rgba(75, 192, 118, 0.12);
+  color: var(--sf-success);
+}
+
+.sf-status.sf-error {
+  background: rgba(224, 69, 69, 0.12);
+  color: var(--sf-error);
+}
+
+.sf-status.sf-loading {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--sf-text-secondary);
+}
+
+.sf-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.sf-status.sf-loading .sf-status-dot {
+  animation: sfPulse 1.5s infinite;
+}
+
+@keyframes sfPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+/* ── Action Buttons ────────────────── */
+.sf-action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.sf-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--sf-transition);
+}
+
+.sf-action-btn.sf-primary {
+  background: var(--sf-blue);
+  color: #fff;
+}
+
+.sf-action-btn.sf-primary:hover {
+  background: var(--sf-blue-hover);
+}
+
+.sf-action-btn.sf-secondary {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--sf-text);
+}
+
+.sf-action-btn.sf-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.sf-action-btn.sf-success-btn {
+  background: var(--sf-success);
+  color: #fff;
+}
+
+.sf-action-btn.sf-success-btn:hover {
+  background: #3aa85c;
+}
+
+/* ── Input Area ─────────────────────── */
+.sf-input-area {
+  padding: 12px 16px 16px;
+  background: var(--sf-dark-bg);
+  border-top: 1px solid var(--sf-border);
+  flex-shrink: 0;
+}
+
+.sf-input-wrapper {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: var(--sf-input-bg);
+  border-radius: 20px;
+  padding: 4px 4px 4px 16px;
+  border: 1px solid var(--sf-border);
+  transition: border-color var(--sf-transition);
+}
+
+.sf-input-wrapper:focus-within {
+  border-color: var(--sf-blue);
+}
+
+.sf-input {
+  flex: 1;
+  background: none;
+  border: none;
+  color: var(--sf-text);
+  font-size: 13px;
+  padding: 8px 0;
+  resize: none;
+  outline: none;
+  font-family: inherit;
+  max-height: 80px;
+  line-height: 1.4;
+}
+
+.sf-input::placeholder {
+  color: #666;
+}
+
+.sf-send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: none;
+  background: var(--sf-blue);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: background var(--sf-transition);
+}
+
+.sf-send-btn:hover {
+  background: var(--sf-blue-hover);
+}
+
+.sf-send-btn:disabled {
+  background: #444;
+  cursor: not-allowed;
+}
+
+.sf-send-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: #fff;
+}
+
+.sf-input-hint {
+  font-size: 11px;
+  color: #666;
+  margin-top: 6px;
+  text-align: center;
+}
+
+/* ── Toast ──────────────────────────── */
+.sf-toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--sf-card-bg);
+  color: var(--sf-text);
+  padding: 12px 20px;
+  border-radius: var(--sf-radius);
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 100001;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+              opacity 0.4s ease;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.sf-toast.sf-visible {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.sf-toast.sf-toast-success {
+  border-left: 3px solid var(--sf-success);
+}
+
+.sf-toast.sf-toast-error {
+  border-left: 3px solid var(--sf-error);
+}
+
+/* ── Settings Panel ─────────────────── */
+.sf-settings-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  animation: sfFadeIn 0.2s ease;
+}
+
+.sf-settings-panel {
+  background: var(--sf-card-bg);
+  border-radius: 12px;
+  padding: 24px;
+  width: calc(100% - 32px);
+  max-width: 320px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+.sf-settings-panel h4 {
+  font-size: 16px;
+  font-weight: 700;
+  margin-bottom: 16px;
+  color: #fff;
+}
+
+.sf-settings-field {
+  margin-bottom: 12px;
+}
+
+.sf-settings-field label {
+  display: block;
+  font-size: 12px;
+  color: var(--sf-text-secondary);
+  margin-bottom: 4px;
+}
+
+.sf-settings-field input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--sf-border);
+  background: var(--sf-input-bg);
+  color: var(--sf-text);
+  font-size: 13px;
+  outline: none;
+  transition: border-color var(--sf-transition);
+}
+
+.sf-settings-field input:focus {
+  border-color: var(--sf-blue);
+}
+
+.sf-settings-save {
+  width: 100%;
+  padding: 10px;
+  background: var(--sf-blue);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background var(--sf-transition);
+}
+
+.sf-settings-save:hover {
+  background: var(--sf-blue-hover);
+}
+
+/* ── Responsive ─────────────────────── */
+@media (max-width: 768px) {
+  .sf-ai-agent {
+    width: 100%;
+  }
+}

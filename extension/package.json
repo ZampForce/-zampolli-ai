@@ -1,0 +1,18 @@
+{
+  "name": "sf-ai-agent-extension",
+  "version": "0.1.0",
+  "description": "Chrome Extension Backend - Salesforce AI Flow Builder",
+  "main": "backend-server.js",
+  "scripts": {
+    "start": "node backend-server.js",
+    "dev": "npx nodemon backend-server.js"
+  },
+  "dependencies": {
+    "adm-zip": "^0.5.17",
+    "cors": "^2.8.5",
+    "dotenv": "^17.4.1",
+    "express": "^4.21.0",
+    "helmet": "^8.0.0",
+    "express-rate-limit": "^7.4.0"
+  }
+}

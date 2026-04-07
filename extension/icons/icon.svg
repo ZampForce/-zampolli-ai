@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="128" y2="128">
+      <stop offset="0%" stop-color="#181b28"/>
+      <stop offset="100%" stop-color="#0d0f17"/>
+    </linearGradient>
+    <linearGradient id="z" x1="0" y1="15" x2="128" y2="115">
+      <stop offset="0%" stop-color="#b8a9ff"/>
+      <stop offset="50%" stop-color="#7b73ff"/>
+      <stop offset="100%" stop-color="#4a44db"/>
+    </linearGradient>
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="5" stdDeviation="10" flood-color="#635bff" flood-opacity="0.4"/>
+    </filter>
+  </defs>
+  <rect width="128" height="128" rx="28" fill="url(#bg)" stroke="#2a2e42" stroke-width="2"/>
+  <ellipse cx="64" cy="66" rx="50" ry="20" fill="#635bff" opacity=".06"/>
+  <g filter="url(#shadow)">
+    <path d="M24 35h80l-65 58h60" fill="none" stroke="url(#z)" stroke-width="18" stroke-linejoin="round" stroke-linecap="round"/>
+  </g>
+</svg>

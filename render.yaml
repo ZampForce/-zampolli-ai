@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: zampolli-ai-backend
+    env: node
+    buildCommand: cd extension && npm install
+    startCommand: cd extension && node backend-server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: OPENROUTER_API_KEY
+        sync: true
+      - key: SALESFORCE_USERNAME
+        sync: true
+      - key: SALESFORCE_PASSWORD
+        sync: true
+      - key: SALESFORCE_TOKEN
+        sync: true
+      - key: SALESFORCE_DOMAIN
+        value: login
+      - key: ALLOWED_ORIGINS
+        sync: true
+
+  - type: web
+    name: zampolli-ai-web
+    env: node
+    buildCommand: npm install
+    startCommand: node web-server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: STRIPE_SECRET_KEY
+        sync: true
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: true
+      - key: STRIPE_PRICE_ID_PRO
+        sync: true
+      - key: APP_URL
+        sync: true
+      - key: ALLOWED_ORIGINS
+        sync: true
