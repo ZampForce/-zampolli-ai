@@ -1,5 +1,17 @@
 const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder');
 
+function getBody(req) {
+  if (typeof req.body === 'object' && req.body !== null) return Promise.resolve(req.body);
+  return new Promise((resolve) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(data)); }
+      catch { resolve({}); }
+    });
+  });
+}
+
 module.exports = async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -14,7 +26,6 @@ module.exports = async (req, res) => {
       mode: 'subscription',
       payment_method_types: ['card'],
       line_items: [{ price: priceId, quantity: 1 }],
-      customer_email: req.query?.email || req.query?.e,
       success_url: `${process.env.APP_URL || ''}/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.APP_URL || ''}/dashboard?canceled=true`,
     });
