@@ -42,7 +42,7 @@ O agente precisa de:
 **AI Provider:**
 - API Key do OpenRouter (https://openrouter.ai)
 - Base URL: `https://openrouter.ai/api/v1`
-- Model: `qwen/qwen3.6-plus:free` (ou qualquer modelo compatible)
+- Model: `nvidia/nemotron-3-super-120b-a12b:free` (ou qualquer modelo compatible)
 
 ## Funcionalidades
 

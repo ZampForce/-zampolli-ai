@@ -1,9 +1,10 @@
+import html
 import json
+import os
+import re
+import shutil
 import subprocess
 import tempfile
-import os
-import shutil
-import re
 from utils.sf_client import get_sf_client
 from utils.ai_client import ask_ai_code
 
@@ -117,8 +118,7 @@ def build_sfdx_deploy_package(flow_xml, flow_name, custom_fields=None):
             else:
                 fname_safe = fname.replace('__c', '')
 
-            objects_dir = os.path.join(temp_dir, 'objects', obj)
-            fields_dir = os.path.join(objects_dir, 'fields')
+            fields_dir = os.path.join(temp_dir, 'objects', obj, 'fields')
             os.makedirs(fields_dir, exist_ok=True)
 
             sf_type = cf.get('type', 'Text')
@@ -170,21 +170,25 @@ def find_sf_cmd():
 
 def sfdx_login(sf_cmd):
     """Login via SFDX. Returns True if already authenticated or login succeeds."""
+    sf_username = os.environ.get('SALESFORCE_USERNAME', '')
     try:
         check = subprocess.run(
             [sf_cmd, 'org', 'list'],
             capture_output=True, text=True, timeout=30,
         )
-        if 'ai-agent-org' in str(check.stdout) or 'teteuzampa@gmail.com' in str(check.stdout):
+        output = str(check.stdout)
+        if 'ai-agent-org' in output or (sf_username and sf_username in output):
             print("Sessao SFDX ativa, pulando login.")
             return True
     except Exception:
         pass
 
+    domain = os.environ.get('SALESFORCE_DOMAIN', 'login')
+    instance_url = f'https://{domain}.salesforce.com'
     print("\nAutenticando com SFDX...")
     try:
         result = subprocess.run(
-            [sf_cmd, 'org', 'login', 'web', '--alias', 'ai-agent-org', '--instance-url', 'https://login.salesforce.com'],
+            [sf_cmd, 'org', 'login', 'web', '--alias', 'ai-agent-org', '--instance-url', instance_url],
             capture_output=True, text=True, timeout=120,
         )
         if result.returncode == 0:
@@ -219,11 +223,7 @@ def sfdx_deploy(sf_cmd, temp_dir):
 
 
 def build_flow_xml(trigger_object, flow_name, flow_label, actions=None):
-    """Build Flow XML - COMPLETAMENTE HARDCODED, SEM USAR VALUES DA AI.
-
-    Gera SEMPRE apenas: Lead After Create -> Create Task (Subject + Status).
-    Nenhum campo vindo da AI é usado nos recordCreates.
-    """
+    """Build Flow XML dynamically from AI-generated spec."""
     trigger_obj = trigger_object or 'Lead'
     try:
         sf = get_sf_client()
@@ -231,7 +231,60 @@ def build_flow_xml(trigger_object, flow_name, flow_label, actions=None):
     except Exception:
         trigger_obj = 'Lead'
 
-    # XML 100% hardcode - nunca usa action['values']
+    # Filter to create_record actions; fallback to default Task creation if none
+    create_actions = [a for a in (actions or []) if a.get('type') == 'create_record']
+    if not create_actions:
+        create_actions = [{
+            'type': 'create_record',
+            'object': 'Task',
+            'values': {'Subject': 'Follow up', 'Status': 'NotStarted'},
+            'description': 'Create Task',
+        }]
+
+    # Build recordCreates blocks
+    record_creates_blocks = []
+    for i, action in enumerate(create_actions):
+        node_name = f"CreateRecord_{i}"
+        obj = action.get('object', 'Task')
+        values = action.get('values', {})
+        label = action.get('description', f'Create {obj}')
+
+        assignments = ''
+        if isinstance(values, dict):
+            for field, value in values.items():
+                safe_val = html.escape(str(value))
+                assignments += f"""
+        <inputAssignments>
+            <field>{field}</field>
+            <value>
+                <stringValue>{safe_val}</stringValue>
+            </value>
+        </inputAssignments>"""
+
+        connector = ''
+        if i < len(create_actions) - 1:
+            next_name = f"CreateRecord_{i + 1}"
+            connector = f"""
+        <connector>
+            <targetReference>{next_name}</targetReference>
+        </connector>"""
+
+        record_creates_blocks.append(
+            f"    <recordCreates>\n"
+            f"        <name>{node_name}</name>\n"
+            f"        <label>{label}</label>\n"
+            f"        <locationX>{176 + i * 200}</locationX>\n"
+            f"        <locationY>198</locationY>\n"
+            f"        <object>{obj}</object>"
+            f"{assignments}"
+            f"{connector}\n"
+            f"        <storeOutputAutomatically>true</storeOutputAutomatically>\n"
+            f"    </recordCreates>"
+        )
+
+    record_creates_xml = '\n'.join(record_creates_blocks)
+    first_node = 'CreateRecord_0'
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Flow xmlns="http://soap.sforce.com/2006/04/metadata">
     <apiVersion>59.0</apiVersion>
@@ -251,31 +304,12 @@ def build_flow_xml(trigger_object, flow_name, flow_label, actions=None):
         </value>
     </processMetadataValues>
     <processType>AutoLaunchedFlow</processType>
-    <recordCreates>
-        <name>CreateTask</name>
-        <label>Create Task</label>
-        <locationX>176</locationX>
-        <locationY>198</locationY>
-        <object>Task</object>
-        <inputAssignments>
-            <field>Subject</field>
-            <value>
-                <stringValue>Follow up with Lead</stringValue>
-            </value>
-        </inputAssignments>
-        <inputAssignments>
-            <field>Status</field>
-            <value>
-                <stringValue>NotStarted</stringValue>
-            </value>
-        </inputAssignments>
-        <storeOutputAutomatically>true</storeOutputAutomatically>
-    </recordCreates>
+{record_creates_xml}
     <start>
         <locationX>50</locationX>
         <locationY>0</locationY>
         <connector>
-            <targetReference>CreateTask</targetReference>
+            <targetReference>{first_node}</targetReference>
         </connector>
         <filterLogic>and</filterLogic>
         <object>{trigger_obj}</object>
@@ -339,7 +373,7 @@ def build_flow(description):
     print(f"Objeto: {trigger_object}")
 
     # Step 2: Get ALL fields
-    print("Analisando organo...")
+    print("Analisando org...")
     object_fields = get_object_fields(trigger_object)
     print(f"Campos encontrados: {len(object_fields['fields'])} em {object_fields['object_name']}")
 
@@ -360,7 +394,7 @@ def build_flow(description):
     else:
         print("\nTodos os campos necessarios ja existem.")
 
-    # Step 6: Build Flow XML
+    # Step 6: Build Flow XML dynamically from AI spec
     flow_name = spec.get('flow_name', 'AutoFlow_' + re.sub(r'[^a-zA-Z0-9_]', '', trigger_object))
     flow_label = spec.get('flow_label', f'Auto Flow - {trigger_object}')
 
@@ -384,27 +418,24 @@ def build_flow(description):
         print("SFDX CLI nao encontrado.")
         return {'status': 'no_sfdx'}
 
-    # Login
     if not sfdx_login(sf_cmd):
         return {'status': 'login_failed'}
 
-    # Create deploy package
     temp_dir = build_sfdx_deploy_package(xml, flow_name, custom_fields=missing)
-
-    # Deploy
-    success, stdout, stderr = sfdx_deploy(sf_cmd, temp_dir)
+    try:
+        success, stdout, stderr = sfdx_deploy(sf_cmd, temp_dir)
+    finally:
+        shutil.rmtree(temp_dir, ignore_errors=True)
 
     if success:
         print(f"\n=== Flow '{flow_name}' criado no Salesforce! ===")
         print("Verifique em Setup > Flows")
-        shutil.rmtree(temp_dir, ignore_errors=True)
         return {'status': 'success', 'flow_name': flow_name}
     else:
         print(f"\nDeploy falhou. XML gerado para correcao:")
         print("=" * 60)
         print(xml)
         print("=" * 60)
-        print(f"\nLog de erro:")
         if stderr:
-            print(stderr)
+            print(f"\nLog de erro:\n{stderr}")
         return {'status': 'error', 'stderr': stderr, 'xml': xml}

@@ -102,29 +102,15 @@
         updateConnectionStatus(sidebar, 'testing');
         testBtn.textContent = 'Testando...';
         testBtn.disabled = true;
-        chrome.storage.local.get('backendUrl', function (res) {
-          fetch(res.backendUrl + '/health', {
-            headers: {
-              'X-SF-Username': sfu,
-              'X-SF-Password': sfp,
-              'X-SF-Domain': sfd,
-            }
-          })
-          .then(function (r) { return r.json(); })
-          .then(function (d) {
-            testBtn.textContent = 'Testar Conexão';
-            testBtn.disabled = false;
-            if (d.sfConnected) {
-              updateConnectionStatus(sidebar, 'connected', 'Conectado como ' + sfu);
-            } else {
-              updateConnectionStatus(sidebar, 'disconnected', 'Não foi possível conectar: ' + (d.sfError || 'Verifique as credenciais'));
-            }
-          })
-          .catch(function () {
-            testBtn.textContent = 'Testar Conexão';
-            testBtn.disabled = false;
-            updateConnectionStatus(sidebar, 'disconnected', 'Não foi possível conectar ao backend');
-          });
+        chrome.runtime.sendMessage({ action: 'backend-fetch', method: 'GET', path: '/health' }, function (result) {
+          testBtn.textContent = 'Testar Conexão';
+          testBtn.disabled = false;
+          if (result && result.success && result.data.sfConnected) {
+            updateConnectionStatus(sidebar, 'connected', 'Conectado como ' + sfu);
+          } else {
+            var msg = result && result.data && result.data.sfError ? result.data.sfError : 'Não foi possível conectar ao backend';
+            updateConnectionStatus(sidebar, 'disconnected', msg);
+          }
         });
       });
     }
@@ -133,6 +119,41 @@
     chrome.runtime.onMessage.addListener(function (msg, sender, sendResponse) {
       if (msg.action === 'ping') { sendResponse({ ok: true }); }
       return false;
+    });
+  }
+
+  // ── Helpers for background-proxy fetches ──
+  function bgFetch(path, method, body) {
+    return new Promise(function (resolve) {
+      chrome.runtime.sendMessage({ action: 'backend-fetch', method: method || 'POST', path: path, body: body }, function (result) {
+        resolve(result);
+      });
+    });
+  }
+
+  function handleDeploy(chat, sidebar, data, flowMetadata, flowName, metadataType, allXml, isField) {
+    chrome.storage.local.get(['sfUsername', 'sfPassword', 'sfDomain'], function (r) {
+      bgFetch('/deploy', 'POST', {
+        flowMetadata: flowMetadata,
+        flowName: flowName || 'AutoFlow',
+        metadataType: metadataType || 'Flow',
+        allXml: allXml || [],
+      }).then(function (d) {
+        if (!d || d.error) {
+          var errHtml = '<strong>Deploy falhou:</strong> ' + esc(d && d.message ? d.message : 'Erro desconhecido');
+          addMsg(chat, 'ai', errHtml);
+          doToast(sidebar, 'Deploy falhou', 'error');
+          return;
+        }
+        var result = d.data || d;
+        if (result.success) {
+          doToast(sidebar, (result.output || (isField ? 'Campo criado!' : 'Flow criado!')), 'success');
+        } else {
+          var eHtml = '<strong>Deploy falhou:</strong> ' + esc(result.error || 'Erro desconhecido');
+          addMsg(chat, 'ai', eHtml);
+          doToast(sidebar, 'Deploy falhou', 'error');
+        }
+      });
     });
   }
 
@@ -159,244 +180,103 @@
       }
 
       var ctx = detectContext();
-      var headers = { 'Content-Type': 'application/json' };
-      var apiKey = '';
 
-      chrome.storage.local.get(['apiKey', 'sfUsername', 'sfPassword', 'sfDomain'], function (r) {
-        apiKey = r.apiKey || '';
-        if (apiKey) headers['Authorization'] = 'Bearer ' + apiKey;
+      bgFetch('/api/generate-flow', 'POST', {
+        prompt: text,
+        orgId: ctx.orgId || '',
+        context: { object: ctx.object || '', url: window.location.href }
+      }).then(function (result) {
+        if (loadingEl) loadingEl.remove();
 
-        // Include user's Salesforce credentials if configured
-        if (r.sfUsername && r.sfPassword) {
-          headers['X-SF-Username'] = r.sfUsername;
-          headers['X-SF-Password'] = r.sfPassword;
-          headers['X-SF-Domain'] = r.sfDomain || 'login';
+        if (!result || result.error) {
+          addMsg(chat, 'ai', '<strong>Erro de comunicação:</strong> ' + (result && result.message ? esc(result.message) : 'Não foi possível conectar ao backend'));
+          doToast(sidebar, 'Erro ao processar solicitação', 'error');
+          return;
+        }
+        if (result.httpError) {
+          addMsg(chat, 'ai', '<strong>Erro:</strong> ' + esc(result.message || 'Request failed'));
+          doToast(sidebar, 'Erro ao processar solicitação', 'error');
+          return;
         }
 
-        fetch(res.backendUrl + '/api/generate-flow', {
-          method: 'POST',
-          headers: headers,
-          body: JSON.stringify({
-            prompt: text,
-            orgId: ctx.orgId || '',
-            context: { object: ctx.object || '', url: window.location.href }
-          })
-        })
-          .then(function (r) {
-            if (!r.ok) throw new Error('HTTP ' + r.status);
-            return r.json();
-          })
-          .then(function (data) {
-            if (loadingEl) loadingEl.remove();
-            var isField = data.metadataType === 'CustomField';
-            var isVR = data.metadataType === 'ValidationRule';
-            var html = '';
-            if (data.instructions) html += '<strong>Resultado:</strong><br>' + esc(data.instructions) + '<br><br>';
+        var data = result.data;
+        var isField = data.metadataType === 'CustomField';
+        var isVR = data.metadataType === 'ValidationRule';
+        var html = '';
+        if (data.instructions) html += '<strong>Resultado:</strong><br>' + esc(data.instructions) + '<br><br>';
 
-            // Show VR details if available
-            if (isVR && data.vrDetails) {
-              var vr = data.vrDetails;
-              html = '<strong>Validation Rule</strong><br><br>';
-              html += '<small>Objeto: <strong>' + esc(vr.object) + '</strong></small><br>';
-              html += '<small>Nome: <strong>' + esc(vr.ruleName) + '</strong></small><br>';
-              html += '<small>Erro: <strong>' + esc(vr.errorMessage) + '</strong></small><br><br>';
-              html += '<details><summary>Ver Fórmula</summary><pre><code>' + esc(vr.formula) + '</code></pre></details>';
-            }
-            if (data.error) {
-              html = '<strong>Erro no processamento:</strong><br><br>' + esc(data.error);
-              if (data.details) html += '<br><br><details><summary>Detalhes técnicos</summary><pre><code>' + esc(data.details) + '</code></pre></details>';
-              addMsg(chat, 'ai', html);
-              doToast(sidebar, 'Erro ao gerar resposta', 'error');
-              return;
-            }
-            if (data.flowMetadata) {
-              var detailLabel = isVR ? 'Ver XML da Regra' : (isField ? 'Ver XML do Campo' : 'Ver XML do Flow');
-              html += '<details><summary>' + detailLabel + '</summary><pre><code>' + esc(data.flowMetadata) + '</code></pre></details>';
-            }
-            if (data.apexCode) html += '<details><summary>Ver Apex</summary><pre><code>' + esc(data.apexCode) + '</code></pre></details>';
+        if (isVR && data.vrDetails) {
+          var vr = data.vrDetails;
+          html = '<strong>Validation Rule</strong><br><br>';
+          html += '<small>Objeto: <strong>' + esc(vr.object) + '</strong></small><br>';
+          html += '<small>Nome: <strong>' + esc(vr.ruleName) + '</strong></small><br>';
+          html += '<small>Erro: <strong>' + esc(vr.errorMessage) + '</strong></small><br><br>';
+          html += '<details><summary>Ver Fórmula</summary><pre><code>' + esc(vr.formula) + '</code></pre></details>';
+        }
+        if (data.error) {
+          html = '<strong>Erro no processamento:</strong><br><br>' + esc(data.error);
+          if (data.details) html += '<br><br><details><summary>Detalhes técnicos</summary><pre><code>' + esc(data.details) + '</code></pre></details>';
+          addMsg(chat, 'ai', html);
+          doToast(sidebar, 'Erro ao gerar resposta', 'error');
+          return;
+        }
+        if (data.flowMetadata) {
+          var detailLabel = isVR ? 'Ver XML da Regra' : (isField ? 'Ver XML do Campo' : 'Ver XML do Flow');
+          html += '<details><summary>' + detailLabel + '</summary><pre><code>' + esc(data.flowMetadata) + '</code></pre></details>';
+        }
+        if (data.apexCode) html += '<details><summary>Ver Apex</summary><pre><code>' + esc(data.apexCode) + '</code></pre></details>';
 
-            // Handle multi-field response
-            if (data.multipleFields && data.multipleFields.length > 1) {
-              var fieldList = data.multipleFields.map(function(f) {
-                return '<strong>' + esc(f.label) + '</strong> (' + esc(f.type) + ') em ' + esc(f.object);
-              }).join('<br>');
-              html = '<strong>Criar ' + data.multipleFields.length + ' campos:</strong><br><br>' + fieldList + '<br>';
-              if (loadingEl) loadingEl.remove();
-              var msgElMulti = addMsg(chat, 'ai', html);
-              if (data.deployable) {
-                setTimeout(function() {
-                  var row = document.createElement('div');
-                  row.className = 'sf-action-row';
-                  var dbtn = document.createElement('button');
-                  dbtn.className = 'sf-action-btn sf-deploy-btn sf-primary';
-                  dbtn.textContent = 'Deploy ' + data.multipleFields.length + ' Campos';
-                  row.appendChild(dbtn);
-                  var bubble = msgElMulti.querySelector('.sf-msg-bubble');
-                  if (bubble) bubble.appendChild(row);
+        // Multi-field batch
+        if (data.multipleFields && data.multipleFields.length > 1) {
+          var fieldList = data.multipleFields.map(function(f) {
+            return '<strong>' + esc(f.label) + '</strong> (' + esc(f.type) + ') em ' + esc(f.object);
+          }).join('<br>');
+          html = '<strong>Criar ' + data.multipleFields.length + ' campos:</strong><br><br>' + fieldList + '<br>';
+          var msgElMulti = addMsg(chat, 'ai', html);
+          if (data.deployable) {
+            setTimeout(function() {
+              var row = document.createElement('div');
+              row.className = 'sf-action-row';
+              var dbtn = document.createElement('button');
+              dbtn.className = 'sf-action-btn sf-deploy-btn sf-primary';
+              dbtn.textContent = 'Deploy ' + data.multipleFields.length + ' Campos';
+              row.appendChild(dbtn);
+              var bubble = msgElMulti.querySelector('.sf-msg-bubble');
+              if (bubble) bubble.appendChild(row);
+              dbtn.addEventListener('click', function() {
+                dbtn.disabled = true;
+                dbtn.textContent = 'Deploying...';
+                handleDeploy(chat, sidebar, data, data.flowMetadata, data.flowName || 'BatchFields', data.metadataType || 'CustomField', data.allXml || [], true);
+                dbtn.textContent = 'Deploying...';
+              });
+            }, 100);
+          }
+          return;
+        }
 
-                  dbtn.addEventListener('click', function() {
-                    dbtn.disabled = true;
-                    dbtn.textContent = 'Deploying...';
-                    var deployHeaders = { 'Content-Type': 'application/json' };
-                    if (r.sfUsername && r.sfPassword) {
-                      deployHeaders['X-SF-Username'] = r.sfUsername;
-                      deployHeaders['X-SF-Password'] = r.sfPassword;
-                      deployHeaders['X-SF-Domain'] = r.sfDomain || 'login';
-                    }
-                    fetch(res.backendUrl + '/deploy', {
-                      method: 'POST',
-                      headers: deployHeaders,
-                      body: JSON.stringify({
-                        flowMetadata: data.flowMetadata,
-                        flowName: data.flowName || 'BatchFields',
-                        metadataType: data.metadataType || 'CustomField',
-                        allXml: data.allXml || [],
-                      })
-                    })
-                      .then(function (r) {
-                        if (!r.ok) throw new Error('HTTP ' + r.status + ' na resposta do servidor');
-                        return r.json();
-                      })
-                      .then(function(d) {
-                        if (d.success) {
-                          doToast(sidebar, (d.output || 'Campos criados!'), 'success');
-                          dbtn.textContent = 'Criados!';
-                          dbtn.classList.add('sf-success-btn');
-                          // Show partial results if some failed
-                          if (d.failCount > 0) {
-                            var warnHtml = '<br><strong style="color:var(--err)">' + d.failCount + ' campo(s) falharam</strong><br><br>';
-                            if (d.results && d.results.length > 0) {
-                              d.results.forEach(function(rr, ii) {
-                                if (!rr.success) {
-                                  warnHtml += '<small style="color:var(--err)">❌ Campo ' + (ii + 1) + ': ' + esc(rr.error || 'Erro desconhecido') + '</small><br>';
-                                } else {
-                                  warnHtml += '<small style="color:var(--ok)">✓ Campo ' + (ii + 1) + ': criado</small><br>';
-                                }
-                              });
-                            }
-                            var warnEl = setTimeout(function() {
-                              var warnMsg = addMsg(chat, 'ai', warnHtml);
-                            }, 200);
-                          }
-                        } else {
-                          var errorHtml = '<strong>Deploy falhou:</strong><br>';
-                          if (d.results && d.results.length > 0) {
-                            d.results.forEach(function(rr, ii) {
-                              if (!rr.success) {
-                                errorHtml += '<small style="color:var(--err)">Campo ' + (ii + 1) + ': ' + esc(rr.error) + '</small><br>';
-                              }
-                            });
-                          } else {
-                            errorHtml += esc(d.error || 'Erro desconhecido. Verifique o terminal do backend para mais detalhes.');
-                          }
-                          addMsg(chat, 'ai', errorHtml);
-                          doToast(sidebar, 'Deploy falhou — veja detalhes no chat', 'error');
-                          dbtn.textContent = 'Failed';
-                          dbtn.disabled = false;
-                        }
-                      })
-                      .catch(function(err) {
-                        var errHtml = '<strong>Erro de rede:</strong> Não foi possível comunicar o servidor.<br><br><small>Verifique se:<br>• O backend está rodando (<code>node backend-server.js</code>)<br>• A URL em ⚙️ está correta (' + esc(res.backendUrl || '') + ')<br>• O Salesforce não está bloqueando CORS</small>';
-                        addMsg(chat, 'ai', errHtml);
-                        doToast(sidebar, 'Erro de rede ao fazer deploy', 'error');
-                        dbtn.textContent = 'Failed';
-                        dbtn.disabled = false;
-                      });
-                  });
-                }, 100);
-              }
-              return;
-            }
+        var msgEl = addMsg(chat, 'ai', html || JSON.stringify(data));
+        if (!data.success && !data.flowMetadata && !data.instructions) {
+          doToast(sidebar, 'Erro ao processar solicitação', 'error');
+        }
 
-            var msgEl = addMsg(chat, 'ai', html || JSON.stringify(data));
-            if (!data.success && !data.flowMetadata && !data.instructions) {
-              doToast(sidebar, 'Erro ao processar solicitação', 'error');
-            }
-
-            if (data.deployable) {
-              setTimeout(function () {
-                var row = document.createElement('div');
-                row.className = 'sf-action-row';
-                var dbtn = document.createElement('button');
-                dbtn.className = 'sf-action-btn sf-deploy-btn sf-primary';
-                dbtn.textContent = isField ? 'Deploy Campo' : 'Deploy Flow';
-                row.appendChild(dbtn);
-                var bubble = msgEl.querySelector('.sf-msg-bubble');
-                if (bubble) bubble.appendChild(row);
-
-                dbtn.addEventListener('click', function () {
-                  dbtn.disabled = true;
-                  dbtn.textContent = 'Deploying...';
-                  var deployHeaders2 = { 'Content-Type': 'application/json' };
-                  if (r.sfUsername && r.sfPassword) {
-                    deployHeaders2['X-SF-Username'] = r.sfUsername;
-                    deployHeaders2['X-SF-Password'] = r.sfPassword;
-                    deployHeaders2['X-SF-Domain'] = r.sfDomain || 'login';
-                  }
-                  fetch(res.backendUrl + '/deploy', {
-                    method: 'POST',
-                    headers: deployHeaders2,
-                    body: JSON.stringify({
-                      flowMetadata: data.flowMetadata,
-                      flowName: data.flowName || 'AutoFlow',
-                      metadataType: data.metadataType || 'Flow',
-                      allXml: data.allXml || [],
-                    })
-                  })
-                    .then(function (resp) {
-                      if (!resp.ok) throw new Error('HTTP ' + resp.status + ' na resposta do servidor');
-                      return resp.json();
-                    })
-                    .then(function (d) {
-                      if (d.success) {
-                        doToast(sidebar, (d.output || (isField ? 'Campo criado!' : 'Flow criado!')), 'success');
-                        dbtn.textContent = isField ? 'Criado!' : 'Deployed';
-                        dbtn.classList.add('sf-success-btn');
-                      } else {
-                        var errHtml = '<strong>Deploy falhou:</strong> ' + esc(d.error || 'Erro desconhecido');
-                        if (String(d.error || '').toLowerCase().includes('já existe')) {
-                          errHtml += '<br><br><small>💡 Este campo já existe no Salesforce. Tente remover ou usar outro nome.</small>';
-                        } else if (String(d.error || '').toLowerCase().includes('length')) {
-                          errHtml += '<br><br><small>💡 Salesforce exige tamanho para campos Text. Tente outro nome ou tipo.</small>';
-                        } else if (String(d.error || '').toLowerCase().includes('precision')) {
-                          errHtml += '<br><br><small>💡 Campos Number/Currency exigem precisão. Informe o tipo correto.</small>';
-                        }
-                        addMsg(chat, 'ai', errHtml);
-                        doToast(sidebar, 'Deploy falhou — veja detalhes no chat', 'error');
-                        dbtn.textContent = 'Failed';
-                        dbtn.disabled = false;
-                      }
-                    })
-                    .catch(function (err) {
-                      var errHtml = '<strong>Erro de rede:</strong> Não foi possível comunicar o servidor.<br><br><small>Verifique se:<br>• O backend está rodando (<code>node backend-server.js</code>)<br>• A URL em ⚙️ está correta (' + esc(res.backendUrl || '') + ')</small>';
-                      addMsg(chat, 'ai', errHtml);
-                      doToast(sidebar, 'Erro de rede ao fazer deploy', 'error');
-                      dbtn.textContent = 'Failed';
-                      dbtn.disabled = false;
-                    });
-                });
-              }, 100);
-            }
-          })
-          .catch(function (err) {
-            if (loadingEl) loadingEl.remove();
-            var msg = err.message || '';
-            var errHtml = '<strong>Erro de comunicação:</strong> ';
-            if (msg.includes('HTTP 5')) {
-              errHtml += 'O servidor encontrou um erro interno (5xx).<br><br>';
-              errHtml += '<small>💡 Veja o terminal do backend para o stack trace completo.</small>';
-            } else if (msg.includes('HTTP 4')) {
-              errHtml += 'Requisição inválida (4xx). Verifique se o prompt está correto.<br><br>';
-              errHtml += '<small>Detalhes: ' + esc(msg) + '</small>';
-            } else if (msg.includes('Failed to fetch') || msg.includes('NetworkError')) {
-              errHtml += 'Não foi possível conectar ao backend.<br><br>';
-              errHtml += '<small>Verifique:<br>• O backend está rodando? (<code>node backend-server.js</code>)<br>• A URL em ⚙️ está correta<br>• O Chrome não está bloqueando requests</small>';
-            } else {
-              errHtml += esc(msg);
-            }
-            addMsg(chat, 'ai', errHtml);
-            doToast(sidebar, 'Erro ao processar solicitação', 'error');
-          });
+        // Deploy button for single flow/field
+        if (data.deployable) {
+          setTimeout(function () {
+            var row = document.createElement('div');
+            row.className = 'sf-action-row';
+            var dbtn = document.createElement('button');
+            dbtn.className = 'sf-action-btn sf-deploy-btn sf-primary';
+            dbtn.textContent = isField ? 'Deploy Campo' : 'Deploy Flow';
+            row.appendChild(dbtn);
+            var bubble = msgEl.querySelector('.sf-msg-bubble');
+            if (bubble) bubble.appendChild(row);
+            dbtn.addEventListener('click', function () {
+              dbtn.disabled = true;
+              dbtn.textContent = 'Deploying...';
+              handleDeploy(chat, sidebar, data, data.flowMetadata, data.flowName || 'AutoFlow', data.metadataType || 'Flow', data.allXml || [], isField);
+            });
+          }, 100);
+        }
       });
     });
   }

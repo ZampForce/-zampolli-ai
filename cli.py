@@ -20,7 +20,7 @@ def show_setup_wizard():
     print('AI Provider Credentials:')
     ai_key = input(f'  AI API Key [{mask(config.get("ai_api_key", ""))}]: ').strip() or config.get('ai_api_key', '')
     ai_url = input(f'  AI Base URL [{config.get("ai_base_url", "https://openrouter.ai/api/v1")}]: ').strip() or config.get('ai_base_url', 'https://openrouter.ai/api/v1')
-    ai_model = input(f'  AI Model [{config.get("ai_model", "qwen/qwen3.6-plus:free")}]: ').strip() or config.get('ai_model', 'qwen/qwen3.6-plus:free')
+    ai_model = input(f'  AI Model [{config.get("ai_model", "nvidia/nemotron-3-super-120b-a12b:free")}]: ').strip() or config.get('ai_model', 'nvidia/nemotron-3-super-120b-a12b:free')
 
     new_config = {
         'salesforce_username': username,
@@ -86,11 +86,9 @@ def main():
             load_env_for_app()
 
         elif choice == '3':
-            import importlib
-            import agents.flow_builder as fb
-            importlib.reload(fb)
+            from agents.flow_builder import build_flow
             desc = input('\nDescreva o fluxo que voce quer criar (ex: "Quando um Lead e criado, criar uma Task automaticamente"): ').strip()
-            result = fb.build_flow(desc)
+            result = build_flow(desc)
             if result.get('status') == 'success':
                 print(f"\n Flow criado com sucesso: {result['flow_name']}")
 

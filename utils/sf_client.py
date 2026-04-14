@@ -1,18 +1,12 @@
 import os
 import requests
 import xml.etree.ElementTree as ET
-from dotenv import load_dotenv
-
-load_dotenv()
 
 
 def get_soap_url():
     """Get SOAP URL based on domain config."""
-    domain = os.getenv("SALESFORCE_DOMAIN", "login")
+    domain = os.environ.get("SALESFORCE_DOMAIN", "login")
     return f"https://{domain}.salesforce.com/services/Soap/u/59.0"
-
-
-SOAP_URL = "https://login.salesforce.com/services/Soap/u/59.0"
 
 
 class SalesforceREST:
@@ -63,9 +57,9 @@ class SalesforceREST:
 
 
 def get_sf_client():
-    username = os.getenv("SALESFORCE_USERNAME")
-    password = os.getenv("SALESFORCE_PASSWORD")
-    token = os.getenv("SALESFORCE_TOKEN", "")
+    username = os.environ.get("SALESFORCE_USERNAME")
+    password = os.environ.get("SALESFORCE_PASSWORD")
+    token = os.environ.get("SALESFORCE_TOKEN", "")
     password_combined = password + token
     soap_url = get_soap_url()
 
