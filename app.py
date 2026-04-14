@@ -131,7 +131,7 @@ def init_env():
     os.environ['SALESFORCE_DOMAIN'] = config.get('salesforce_domain', 'login')
     os.environ['OPENAI_API_KEY'] = config.get('ai_api_key', '')
     os.environ['OPENAI_BASE_URL'] = config.get('ai_base_url', 'https://openrouter.ai/api/v1')
-    os.environ['OPENAI_MODEL'] = config.get('ai_model', 'qwen/qwen3.6-plus:free')
+    os.environ['OPENAI_MODEL'] = config.get('ai_model', 'nvidia/nemotron-3-super-120b-a12b:free')
     init_env.has_creds = bool(
         os.environ['SALESFORCE_USERNAME'] and os.environ['OPENAI_API_KEY']
     )
@@ -174,6 +174,21 @@ with st.sidebar:
         st.markdown(f"<div style='color:#8BE04F;font-size:0.8rem;'>Conectado</div>", unsafe_allow_html=True)
     else:
         st.markdown("<div style='color:#FCB401;font-size:0.8rem;'>Nao configurado</div>", unsafe_allow_html=True)
+
+    # ── Guia de Uso ────────────────────────────────────────────────
+    st.markdown("<div style='margin-top:24px;padding-top:16px;border-top:1px solid rgba(255,255,255,0.1);'>", unsafe_allow_html=True)
+    st.markdown("<div style='color:rgba(255,255,255,0.4);font-size:0.75rem;margin-bottom:8px;'>COMO USAR</div>", unsafe_allow_html=True)
+    st.markdown("""
+    <div style='color:rgba(255,255,255,0.7);font-size:0.7rem;line-height:1.4;'>
+    1. <b>Configure credenciais</b> em Configurações<br/>
+    2. <b>Salesforce:</b> Email, senha e token de segurança<br/>
+    3. <b>AI:</b> API Key do OpenRouter (https://openrouter.ai)<br/>
+    4. <b>Escolha uma funcionalidade</b> no menu acima<br/>
+    5. <b>Preencha os campos</b> e clique em executar<br/>
+    6. <b>Acompanhe os resultados</b> na tela principal
+    </div>
+    """, unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 
 # ── Page Helpers ────────────────────────────────────────────
@@ -292,11 +307,9 @@ elif st.session_state.page == "flow-builder":
 
             with st.spinner("Analisando org e gerando o Flow..."):
                 try:
-                    import importlib
-                    import agents.flow_builder as fb
-                    importlib.reload(fb)
+                    from agents.flow_builder import build_flow
 
-                    result = capture_output(fb.build_flow, desc.strip())
+                    result = capture_output(build_flow, desc.strip())
                     st.success("Processamento concluido!")
                     st.text_area("Log de Execucao", value=result, height=400, disabled=True)
                 except Exception as e:
@@ -385,7 +398,7 @@ elif st.session_state.page == "settings":
         new_ai_key = st.text_input("AI API Key", value=config.get('ai_api_key', ''), type="password")
     with col4:
         new_ai_url = st.text_input("Base URL", value=config.get('ai_base_url', 'https://openrouter.ai/api/v1'))
-        new_ai_model = st.text_input("Model", value=config.get('ai_model', 'qwen/qwen3.6-plus:free'))
+        new_ai_model = st.text_input("Model", value=config.get('ai_model', 'nvidia/nemotron-3-super-120b-a12b:free'))
 
     if st.button("Salvar Configuracao", type="primary", use_container_width=True):
         new_config = {

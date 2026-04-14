@@ -23,7 +23,7 @@ app.use(helmet({
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS
     ? process.env.ALLOWED_ORIGINS.split(',')
-    : ['http://localhost:8080', 'http://localhost:3000', '*'],
+    : ['http://localhost:8080', 'http://localhost:3000'],
   credentials: true,
 }));
 app.use(express.json());
@@ -54,6 +54,9 @@ function getCurrentModel() {
 // ── AI helpers ───────────────────────────────────────────
 async function callAI(prompt) {
   const model = getCurrentModel();
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 120000); // 2 min timeout
+
   const resp = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
@@ -65,7 +68,10 @@ async function callAI(prompt) {
       messages: [{ role: 'user', content: prompt }],
       temperature: 0.1,
     }),
+    signal: controller.signal,
   });
+
+  clearTimeout(timeout);
 
   if (!resp.ok) {
     const errText = await resp.text();
@@ -417,40 +423,37 @@ async function sfDeployValidationRule(instanceUrl, accessToken, xmlContent) {
 async function generateValidationRuleWithAI(prompt, triggerObject) {
   const systemPrompt = `You are an expert Salesforce admin. Generate a Salesforce Validation Rule as XML.
 
-CRITICAL RULES:
-- Return ONLY the XML, no markdown, no explanation, no code blocks
-- The errorConditionFormula must use Salesforce formula syntax (ISBLANK, ISNEW(), ISCHANGED(), ISPICKVAL(), OR(), AND(), NOT())
-- The formula evaluates to TRUE when the rule should BLOCK the save
-- errorDisplayField is the API name of the field to highlight (no __c suffix for standard fields)
-- fullName format: ObjectName.RuleName__c (e.g., Account.Email_Required__c)
+Return a JSON object with "formula", "errorMessage", "errorDisplayField", and "ruleName" keys. Then I will build the XML.
 
-ValidationRule XML format:
-<?xml version="1.0" encoding="UTF-8"?>
-<ValidationRule xmlns="http://soap.sforce.com/2006/04/metadata">
-    <fullName>Account.Email_Required__c</fullName>
-    <active>true</active>
-    <errorConditionFormula>ISBLANK(Email)</errorConditionFormula>
-    <errorDisplayField>Email</errorDisplayField>
-    <errorMessage>Email é obrigatório</errorMessage>
-</ValidationRule>
+CRITICAL RULES:
+- The formula must use Salesforce formula syntax (ISBLANK, ISNEW(), ISCHANGED(), ISPICKVAL(), OR(), AND(), NOT())
+- The formula evaluates to TRUE when the rule should BLOCK the save
+- errorDisplayField is the API name of the field to highlight (e.g. Phone, Email) — leave "" if no specific field
+- ruleName is CamelCase without spaces (e.g., Phone_Required__c)
 
 Common patterns:
 - Required field: ISBLANK(FieldName)
 - Required only on new record: AND(ISNEW(), ISBLANK(FieldName))
 - Conditionally required: AND(NOT(ISBLANK(Status)), ISBLANK(FieldName))
 - Picklist value check: ISPICKVAL(FieldName, "Value")
-- Number comparison: Amount < 0 || Amount > 1000000
-- Date comparison: CloseDate < TODAY()
 - Cross-field: AND(ISNEW(), ISBLANK(Phone) && ISBLANK(Email))
+
+Return ONLY JSON, no markdown, no explanation.
 `;
 
   try {
-    const aiResponse = await callAIWithFallback(`${systemPrompt}\n\nObject: ${triggerObject || 'Account'}\nUser request: "${prompt}"\n\nReturn ONLY the ValidationRule XML.`);
-    const cleanXml = aiResponse.replace(/```xml\s*/g, '').replace(/```\s*/g, '').trim();
-    if (!cleanXml.includes('<?xml') || !cleanXml.includes('<ValidationRule')) {
-      throw new Error('AI response is not valid ValidationRule XML');
-    }
-    return cleanXml;
+    const aiResponse = await callAIWithFallback(`${systemPrompt}\n\nObject: ${triggerObject || 'Account'}\nUser request: "${prompt}"\n\nReturn ONLY JSON.`);
+    const result = extractJSON(aiResponse);
+    if (!result.formula) throw new Error('AI response missing "formula" field');
+
+    const obj = triggerObject || 'Account';
+    const ruleName = result.ruleName || 'VR_' + obj + '_Rule';
+    const fullName = obj + '.' + ruleName;
+    const formula = result.formula.trim();
+    const errMsg = result.errorMessage || 'Operação bloqueada pela regra de validação.';
+    const displayField = result.errorDisplayField || '';
+
+    return generateValidationRuleXML(fullName, ruleName, formula, errMsg, displayField);
   } catch (err) {
     console.log('[AI ValidationRule Generation] Failed:', err.message);
     return null;
@@ -636,7 +639,7 @@ async function sfLogin(creds, req) {
         </env:Header>
         <env:Body>
             <login xmlns="urn:partner.soap.sforce.com">
-                <username>${SF_USERNAME}</username>
+                <username>${username}</username>
                 <password>${passwordCombined}</password>
             </login>
         </env:Body>

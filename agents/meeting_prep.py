@@ -7,6 +7,15 @@ def prep_meeting(contact_id):
 
     contact = sf.Contact.get(contact_id)
 
+    # Fetch account name instead of showing raw AccountId
+    account_name = 'N/A'
+    if contact.get('AccountId'):
+        try:
+            account = sf._get_object('Account', contact['AccountId'])
+            account_name = account.get('Name', contact['AccountId'])
+        except Exception:
+            account_name = contact['AccountId']
+
     opps = sf.query(f'''
         SELECT Name, StageName, Amount, CloseDate
         FROM Opportunity
@@ -26,7 +35,7 @@ def prep_meeting(contact_id):
     prompt = f'''
     Crie um briefing de reuniao com este contato:
 
-    CONTATO: {contact.get('Name')} - {contact.get('Title', 'N/A')} na {contact.get('AccountId')}
+    CONTATO: {contact.get('Name')} - {contact.get('Title', 'N/A')} na {account_name}
     Email: {contact.get('Email', 'N/A')}
     Telefone: {contact.get('Phone', 'N/A')}
 

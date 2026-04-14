@@ -1,34 +1,34 @@
 /**
  * Salesforce AI Flow Builder - Background Service Worker
- * Handles extension lifecycle, icon toggle, and optional proxy messaging.
+ * Handles all backend communication from the sidebar,
+ * avoiding mixed-content blocking (HTTPS page → HTTP localhost).
  */
 
-// ── Install ───────────────────────────────────────────────
 chrome.runtime.onInstalled.addListener((details) => {
   if (details.reason === 'install') {
-    chrome.storage.local.set({
-      backendUrl: '',
-      apiKey: '',
-    });
-
-    chrome.tabs.create({
-      url: chrome.runtime.getURL('onboarding.html'),
-    });
-
-    console.log('[SF Agent] Installed — onboarding opened');
+    chrome.storage.local.set({ backendUrl: '', apiKey: '' });
+    chrome.tabs.create({ url: chrome.runtime.getURL('onboarding.html') });
   }
 });
 
-// ── Action Click (Toggle Extension) ──────────────────────
 chrome.action.onClicked.addListener(async (tab) => {
-  // Toggle the sidebar via messaging to the content script
   await chrome.tabs.sendMessage(tab.id, { action: 'toggle' });
 });
 
-// ── Message Handler ──────────────────────────────────────
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.create({ id: 'send-to-sf-agent', title: 'Send to SF AI Agent', contexts: ['selection'] });
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  if (info.menuItemId === 'send-to-sf-agent') {
+    chrome.tabs.sendMessage(tab.id, { action: 'prefill', text: info.selectionText });
+  }
+});
+
+// ── Backend Proxy (handles all fetches from the sidebar) ──
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'get-settings') {
-    chrome.storage.local.get(['backendUrl', 'apiKey'], (result) => {
+    chrome.storage.local.get(['backendUrl', 'apiKey', 'sfUsername', 'sfPassword', 'sfDomain'], (result) => {
       sendResponse(result);
     });
     return true;
@@ -41,35 +41,46 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
-  if (message.action === 'deploy-to-org') {
-    // Future: integrate with Metadata API via server
-    // For now, forward to content script which handles the UI
-    chrome.tabs.sendMessage(sender.tab.id, message, (response) => {
-      if (chrome.runtime.lastError) {
-        sendResponse({ error: chrome.runtime.lastError.message });
-      } else {
-        sendResponse(response || {});
+  // Proxy: backend API call from background (no mixed content block)
+  if (message.action === 'backend-fetch') {
+    chrome.storage.local.get(['backendUrl', 'apiKey', 'sfUsername', 'sfPassword', 'sfDomain'], async (storage) => {
+      if (!storage.backendUrl) {
+        sendResponse({ error: true, message: 'Backend URL não configurada' });
+        return;
+      }
+
+      const url = storage.backendUrl + message.path;
+      const headers = { 'Content-Type': 'application/json' };
+      if (storage.apiKey) headers['Authorization'] = 'Bearer ' + storage.apiKey;
+      if (storage.sfUsername) headers['X-SF-Username'] = storage.sfUsername;
+      if (storage.sfPassword) headers['X-SF-Password'] = storage.sfPassword;
+      if (storage.sfDomain) headers['X-SF-Domain'] = storage.sfDomain;
+
+      try {
+        const resp = await fetch(url, {
+          method: message.method || 'POST',
+          headers,
+          body: message.body ? JSON.stringify(message.body) : undefined,
+        });
+
+        const data = await resp.json().catch(() => ({ error: 'Invalid JSON response' }));
+
+        if (!resp.ok) {
+          sendResponse({
+            httpError: true,
+            status: resp.status,
+            data,
+            message: 'HTTP ' + resp.status,
+          });
+        } else {
+          sendResponse({ success: true, data });
+        }
+      } catch (err) {
+        sendResponse({ error: true, message: err.message || 'Network error' });
       }
     });
-    return true;
+    return true; // async sendResponse
   }
-});
 
-// ── Context Menu (right-click to send to AI) ─────────────
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'send-to-sf-agent',
-    title: 'Send to SF AI Agent',
-    contexts: ['selection'],
-  });
-});
-
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'send-to-sf-agent') {
-    // Open sidebar and pre-fill with selected text
-    chrome.tabs.sendMessage(tab.id, {
-      action: 'prefill',
-      text: info.selectionText,
-    });
-  }
+  return false;
 });
